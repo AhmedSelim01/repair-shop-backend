@@ -6,8 +6,7 @@ const express = require('express'); // Web framework
 const cors = require('cors'); // Cross-Origin Resource Sharing
 const connectDB = require('./config/db'); // Database connection
 const logger = require('./config/logger'); // Winston logging system
-const swaggerUi = require('swagger-ui-express'); // API documentation UI
-const swaggerSpec = require('./config/swagger'); // Swagger configuration
+const { specs, swaggerUi } = require('./config/swagger'); // API documentation UI and Swagger configuration
 const { setupSecurity, rateLimiters } = require('./middleware/security'); // Security headers and rate limiting
 
 const authRoutes = require('./routes/authRoutes'); // Authentication routes
@@ -18,7 +17,6 @@ const driverRoutes = require('./routes/driverRoutes');
 const truckRoutes = require('./routes/truckRoutes');
 const jobCardRoutes = require('./routes/jobCardRoutes');
 const healthRoutes = require('./routes/healthRoutes');
-const { specs, swaggerUi } = require('./config/swagger');
 
 // Initialize Express application
 const app = express();
