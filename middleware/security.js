@@ -1,19 +1,27 @@
+// Import security middleware packages
+const rateLimit = require('express-rate-limit'); // Prevents brute force attacks
+const helmet = require('helmet'); // Sets security headers
+const mongoSanitize = require('express-mongo-sanitize'); // Prevents NoSQL injection
 
-const rateLimit = require('express-rate-limit');
-const helmet = require('helmet');
-const mongoSanitize = require('express-mongo-sanitize');
-
-// Rate limiting configurations
+/**
+ * RATE LIMITER FACTORY
+ * Creates customizable rate limiting middleware for different endpoints
+ * Helps prevent brute force attacks and API abuse
+ * @param {Number} windowMs - Time window in milliseconds
+ * @param {Number} max - Maximum requests allowed in time window
+ * @param {String} message - Error message when limit exceeded
+ * @returns {Function} - Express middleware function
+ */
 const createRateLimiter = (windowMs, max, message) => {
   return rateLimit({
-    windowMs,
-    max,
+    windowMs, // Time window for rate limiting
+    max, // Maximum number of requests allowed
     message: {
       success: false,
       message
-    },
-    standardHeaders: true,
-    legacyHeaders: false,
+    }, // Response when limit exceeded
+    standardHeaders: true, // Send rate limit info in headers
+    legacyHeaders: false, // Don't send legacy X-RateLimit headers
   });
 };
 

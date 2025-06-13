@@ -1,15 +1,23 @@
-//const asyncHandler = require('../middleware/asyncHandler');
-const asyncHandler = require('express-async-handler');
-const Company = require('../models/Company');
+// Import required dependencies
+const asyncHandler = require('express-async-handler'); // Async error handling wrapper
+const Company = require('../models/Company'); // Company data model
 
+/**
+ * CREATE COMPANY ENDPOINT
+ * Registers a new company in the system with initial profile status
+ * Validates uniqueness and provides next steps for profile completion
+ */
 exports.createCompany = asyncHandler(async(req, res, next) => {
     try {
+        // Extract required fields from request body
         const { companyName, contactEmail } = req.body;
 
+        // Note: This ID validation appears to be misplaced - should be removed
         if (!mongoose.Types.ObjectId.isValid(id)) {
             return res.status(400).json({ success: false, message: 'Invalid company ID.' });
         }
 
+        // INPUT VALIDATION: Ensure required fields are provided
         if (!companyName || !contactEmail) {
             return res.status(400).json({ 
                 success: false, 

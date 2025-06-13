@@ -1,43 +1,52 @@
-const mongoose = require('mongoose');
-const bcrypt = require('bcryptjs');
-const Company = require('./Company');
-const {v4: uuidv4 } = require('uuid');
-const { parsePhoneNumberWithError } = require('libphonenumber-js');
+// Import required dependencies for User model
+const mongoose = require('mongoose'); // MongoDB ODM
+const bcrypt = require('bcryptjs'); // For password hashing
+const Company = require('./Company'); // Reference to Company model
+const {v4: uuidv4 } = require('uuid'); // For generating unique reset codes
+const { parsePhoneNumberWithError } = require('libphonenumber-js'); // International phone validation
 
-// Define the main User schema
+/**
+ * USER SCHEMA DEFINITION
+ * Central user model supporting multiple roles in the repair shop system
+ * Includes validation, security features, and role-based field requirements
+ */
 const UserSchema = new mongoose.Schema(
   {
-    // Basic Info
+    // ===== BASIC USER INFORMATION =====
     name: { 
       type: String, 
-      trim: true, 
+      trim: true, // Removes whitespace from beginning and end
       required: function() {
-        // Name is required for roles: general, employee, truck_owner
+        // CONDITIONAL REQUIREMENT: Name required for specific roles only
+        // Admin users don't need names as they're system accounts
         return ['general', 'employee', 'truck_owner'].includes(this.role);
       }
     },
     email: {
       type: String,
-      unique: true,
-      lowercase: true,
+      unique: true, // Prevents duplicate email addresses
+      lowercase: true, // Automatically converts to lowercase for consistency
       required: true,
       validate: {
+        // REGEX VALIDATION: Ensures proper email format
         validator: (value) => /^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/.test(value),
         message: 'Invalid email format.'
       }
     },
     phone: {
       type: String,
-      unique: true,
+      unique: true, // Each phone number can only be used once
       required: function() {
-        // Phone is required for all roles except admin
+        // BUSINESS RULE: Phone required for all roles except admin
+        // Admins are internal users who don't need phone contact
         return this.role !== "admin";
       },
       validate: {
         validator: function(value) {
-          if (!value) return true;
+          if (!value) return true; // Allow empty for admin users
           try {
-            // Use the new API to parse and validate the phone number
+            // INTERNATIONAL PHONE VALIDATION using libphonenumber-js
+            // Defaults to UAE (AE) country code for regional business
             const phoneNumber = parsePhoneNumberWithError(value, 'AE');
             return phoneNumber.isValid();
           } catch (err) {
@@ -50,9 +59,10 @@ const UserSchema = new mongoose.Schema(
     password: { 
       type: String, 
       required: true, 
-      minlength: 8,
+      minlength: 8, // Minimum security requirement
       validate: {
         validator: function(value) {
+          // STRONG PASSWORD POLICY: Requires uppercase, lowercase, number, and special character
           const passwordRegex = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&])[A-Za-z\d@$!%*?&]{8,}$/;
           return passwordRegex.test(value);
         },
@@ -127,16 +137,32 @@ UserSchema.index({ email: 1 }, { unique: true });
 UserSchema.index({ phone: 1 }, { unique: true });
 UserSchema.index({ role: 1 });
 
-// Hash the password before saving
+/**
+ * PRE-SAVE MIDDLEWARE: PASSWORD HASHING
+ * Automatically hashes passwords before saving to database
+ * Only runs when password is modified to avoid unnecessary hashing
+ */
 UserSchema.pre('save', async function(next) {
+  // Skip hashing if password hasn't been modified (for other field updates)
   if (!this.isModified('password')) return next();
+  
+  // Generate salt for bcrypt (10 rounds = good balance of security vs performance)
   const salt = await bcrypt.genSalt(10);
+  
+  // Hash the password with the generated salt
   this.password = await bcrypt.hash(this.password, salt);
   next();
 });
 
-// Method to compare passwords
+/**
+ * INSTANCE METHOD: PASSWORD COMPARISON
+ * Compares plain text password with hashed password in database
+ * Used during login authentication
+ * @param {String} enteredPassword - Plain text password from login form
+ * @returns {Boolean} - True if passwords match, false otherwise
+ */
 UserSchema.methods.matchPassword = async function(enteredPassword) {
+  // bcrypt.compare handles the hashing and comparison securely
   return bcrypt.compare(enteredPassword, this.password);
 };
 

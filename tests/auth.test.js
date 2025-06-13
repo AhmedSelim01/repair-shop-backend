@@ -1,22 +1,35 @@
 
-const request = require('supertest');
-const app = require('../server');
-const User = require('../models/User');
-const mongoose = require('mongoose');
+// Import testing dependencies
+const request = require('supertest'); // HTTP assertion library for API testing
+const app = require('../server'); // Express application instance
+const User = require('../models/User'); // User model for database operations
+const mongoose = require('mongoose'); // MongoDB ODM
 
+/**
+ * AUTHENTICATION ENDPOINTS TEST SUITE
+ * Comprehensive testing for user registration and login functionality
+ * Tests both success cases and various error scenarios
+ */
 describe('Authentication Endpoints', () => {
+  // SETUP: Clean database before each test to ensure test isolation
   beforeEach(async () => {
-    await User.deleteMany({});
+    await User.deleteMany({}); // Remove all users from test database
   });
 
+  /**
+   * USER REGISTRATION TESTS
+   * Tests the POST /api/auth/register endpoint
+   * Covers successful registration and validation failures
+   */
   describe('POST /api/auth/register', () => {
     it('should register a new user successfully', async () => {
+      // ARRANGE: Prepare valid user data for registration
       const userData = {
         email: 'test@example.com',
-        password: 'SecurePass123!',
+        password: 'SecurePass123!', // Meets password complexity requirements
         role: 'general',
         name: 'Test User',
-        phoneNumber: '+1234567890'
+        phoneNumber: '+1234567890' // Valid international format
       };
 
       const response = await request(app)

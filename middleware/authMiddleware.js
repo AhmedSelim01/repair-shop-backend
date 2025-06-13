@@ -1,6 +1,7 @@
-const jwt = require('jsonwebtoken');
-const asyncHandler = require('express-async-handler');
-const User = require('../models/User');
+// Import required dependencies for JWT authentication
+const jwt = require('jsonwebtoken'); // JWT token verification
+const asyncHandler = require('express-async-handler'); // Async error handling
+const User = require('../models/User'); // User model for database lookups
 require('dotenv').config();
 
 // Middleware to check authentication

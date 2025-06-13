@@ -1,13 +1,14 @@
 const dotenv = require('dotenv');
 dotenv.config();
 
-const express = require('express');
-const cors = require('cors');
-const connectDB = require('./config/db'); // Import the database connection utility
-const mongoose = require('mongoose'); // For database connection and graceful shutdown
-const errorHandler = require('./middleware/errorHandler'); // Central error handler
-const logger = require('./config/logger'); // Winston logger
-const { setupSecurity, rateLimiters } = require('./middleware/security'); // Security middleware     
+// ===== IMPORT CORE DEPENDENCIES =====
+const express = require('express'); // Web framework
+const cors = require('cors'); // Cross-Origin Resource Sharing
+const connectDB = require('./config/db'); // Database connection
+const logger = require('./config/logger'); // Winston logging system
+const swaggerUi = require('swagger-ui-express'); // API documentation UI
+const swaggerSpec = require('./config/swagger'); // Swagger configuration
+const { setupSecurity, rateLimiters } = require('./middleware/security'); // Security headers and rate limiting
 
 const authRoutes = require('./routes/authRoutes'); // Authentication routes
 const userRoutes = require('./routes/userRoutes'); // User-related routes
@@ -19,9 +20,14 @@ const jobCardRoutes = require('./routes/jobCardRoutes');
 const healthRoutes = require('./routes/healthRoutes');
 const { specs, swaggerUi } = require('./config/swagger');
 
+// Initialize Express application
 const app = express();
 
-// Connect to MongoDB
+/**
+ * DATABASE CONNECTION
+ * Establishes connection to MongoDB using Mongoose
+ * Handles connection errors and logs success/failure
+ */
 connectDB();
 
 // Security setup

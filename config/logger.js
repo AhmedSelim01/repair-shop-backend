@@ -1,13 +1,29 @@
+// Import Winston logging library and Node.js path utilities
+const winston = require('winston'); // Professional logging library
+const path = require('path'); // Node.js path manipulation
 
-const winston = require('winston');
-const path = require('path');
+/**
+ * LOGS DIRECTORY SETUP
+ * Ensures logs directory exists before Winston tries to write to it
+ * Prevents runtime errors if logs folder is missing
+ */
+const fs = require('fs');
+const logsDir = path.join(__dirname, '../logs');
+if (!fs.existsSync(logsDir)) {
+  fs.mkdirSync(logsDir); // Create logs directory if it doesn't exist
+}
 
-// Define log format
+/**
+ * LOG FORMAT CONFIGURATION
+ * Defines standardized format for all log entries
+ * Combines timestamp, error stack traces, and JSON formatting
+ */
 const logFormat = winston.format.combine(
-  winston.format.timestamp({ format: 'YYYY-MM-DD HH:mm:ss' }),
-  winston.format.errors({ stack: true }),
-  winston.format.json(),
-  winston.format.prettyPrint()
+  winston.format.timestamp({
+    format: 'YYYY-MM-DD HH:mm:ss' // Human-readable timestamp format
+  }),
+  winston.format.errors({ stack: true }), // Include full error stack traces
+  winston.format.json() // Format as JSON for easy parsing and analysis
 );
 
 // Create logger instance

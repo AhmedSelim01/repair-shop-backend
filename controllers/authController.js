@@ -1,30 +1,47 @@
+// Import required dependencies for authentication functionality
 const User = require('../models/User');
-const asyncHandler = require('express-async-handler');
-const jwt = require('jsonwebtoken');
-const crypto = require('crypto');
-const passwordResetLimiter = require('../models/RateLimiter');
-require('dotenv').config();
+const asyncHandler = require('express-async-handler'); // Handles async errors automatically
+const jwt = require('jsonwebtoken'); // For creating and verifying JWT tokens
+const crypto = require('crypto'); // For generating secure random codes
+const passwordResetLimiter = require('../models/RateLimiter'); // Rate limiting for security
+require('dotenv').config(); // Load environment variables
 
-// Utility to generate JWT
+/**
+ * Utility function to generate JWT tokens for authenticated users
+ * @param {Object} user - User object from database
+ * @returns {String} - Signed JWT token containing user info
+ */
 const generateToken = (user) => {
     return jwt.sign(
-        { id: user._id, role: user.role, email: user.email },
-        process.env.JWT_SECRET,
-        { expiresIn: process.env.JWT_EXPIRES_IN || '1d' }
+        { 
+            id: user._id,    // User's unique database ID
+            role: user.role, // User's role for authorization
+            email: user.email // User's email for identification
+        },
+        process.env.JWT_SECRET, // Secret key from environment variables
+        { expiresIn: process.env.JWT_EXPIRES_IN || '1d' } // Token expiration (default 1 day)
     );
 };
 
-// User Registration
+/**
+ * USER REGISTRATION ENDPOINT
+ * Handles new user registration with role-based field validation
+ * Prevents duplicate accounts and enforces business rules
+ */
 exports.registerUser = asyncHandler(async (req, res) => {
+    // Extract all possible fields from request body
     const { name, phone, email, password, companyName, licensePlate, driverInfo, role } = req.body;
 
+    // Basic validation - password is mandatory for all users
     if (!password) {
         return res.status(400).json({ message: 'Password is required.' });
     }
 
-    // Check for duplicate email or phone
+    // DUPLICATE PREVENTION: Check if email or phone already exists in database
+    // Using MongoDB $or operator to check multiple conditions
     const duplicateUser = await User.findOne({ $or: [{ email }, { phone }] });
     if (duplicateUser) {
+        // Build detailed error message showing which fields conflict
         const conflicts = [];
         if (duplicateUser.email === email) conflicts.push('email');
         if (duplicateUser.phone === phone) conflicts.push('phone number');
@@ -53,27 +70,35 @@ exports.registerUser = asyncHandler(async (req, res) => {
     });
 });
 
-// User login
+/**
+ * USER LOGIN ENDPOINT
+ * Authenticates users and returns JWT token for session management
+ * Uses bcrypt for secure password comparison
+ */
 exports.loginUser = asyncHandler(async (req,res) => {
     const { email, password } = req.body;
 
-    // Check if email and password are provided
+    // INPUT VALIDATION: Ensure both email and password are provided
     if(!email || !password) {
         return res.status(400).json({ message: 'Email and password are required.' });
     }
 
-    // Find the user by email
+    // DATABASE LOOKUP: Find user by email (case-insensitive due to schema)
     const user = await User.findOne({ email });
-    // Check if the user exists and if the password matches
+    
+    // AUTHENTICATION CHECK: Verify user exists and password matches
+    // user.matchPassword() is a custom method that uses bcrypt.compare()
     if (user && (await user.matchPassword(password))) {
+        // SUCCESS: Return user data and JWT token for future requests
         res.status(200).json({ 
             _id: user._id,
             name: user.name,
             email: user.email,
-            role: user.role,
-            token: generateToken(user),
+            role: user.role, // Important for role-based access control
+            token: generateToken(user), // JWT token for authentication
         });
     } else {
+        // FAILURE: Generic error message for security (don't reveal if email exists)
         res.status(400).json({ message: 'Invalid email or password.' });
     }
 });
