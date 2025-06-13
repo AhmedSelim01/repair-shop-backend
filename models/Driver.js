@@ -1,59 +1,134 @@
+
 const mongoose = require('mongoose');
+const { parsePhoneNumberWithError } = require('libphonenumber-js');
 
-const DriverSchema = new mongoose.Schema(
-    {
-        // Driver Basic Info
-        driverName: { type: String, required: true, trim: true },
-        driverPhone: {
-            type: String,
-            required: true,
-            validate: {
-                validator: (v) => /^[0-9]{10}$/.test(v),
-                message: (props) => `${props.value} is not a valid phone number!`
-            }
-        },
-        driverIdNumber: { type: String, required: true },
-        licensePlate: {
-            type: String,
-            required: true,
-            trim: true,
-            validate: {
-                validator: (v) => /^[A-Z0-9-]+$/.test(v),
-                message: (props) => `${props.value} is not a valid license plate!`
-            }
-        },
-        emergencyContact: {
-            name: { type: String, required: true, trim: true },
-            phone: {
-                type: String,
-                validate: {
-                    validator: (v) => /^[0-9]{10}$/.test(v),
-                    message: (props) => `${props.value} is not a valid phone number!`
-                }
-            }
-        },
-        // User reference
-        userId: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
-        // Company association
-        associatedCompany: { type: mongoose.Schema.Types.ObjectId, ref: 'Company', default: null },
-        // For unregistered company drivers
-        externalCompanyDetails: {
-            companyName: String,
-            contactPerson: String,
-            contactNumber: String,
-            contactEmail: String
-        },
-        isRegisteredCompanyDriver: { type: Boolean, default: false },
-        truckNumber: String
+const DriverSchema = new mongoose.Schema({
+  driverName: {
+    type: String,
+    required: true,
+    trim: true,
+    minlength: 2,
+    maxlength: 50
+  },
+  driverPhone: {
+    type: String,
+    required: true,
+    unique: true,
+    validate: {
+      validator: function(value) {
+        try {
+          const phoneNumber = parsePhoneNumberWithError(value, 'AE');
+          return phoneNumber.isValid();
+        } catch (err) {
+          return false;
+        }
+      },
+      message: 'Phone must be a valid international number.'
+    }
+  },
+  driverIdNumber: {
+    type: String,
+    required: true,
+    unique: true,
+    trim: true
+  },
+  licensePlate: {
+    type: String,
+    required: true,
+    validate: {
+      validator: (value) => /^[A-Z0-9-]{2,11}$/.test(value),
+      message: 'License plate must be 2-11 characters (A-Z, 0-9, hyphens)'
+    }
+  },
+  emergencyContact: {
+    name: {
+      type: String,
+      required: true,
+      trim: true
     },
-    { timestamps: true }
-);
+    phone: {
+      type: String,
+      required: true,
+      validate: {
+        validator: function(value) {
+          try {
+            const phoneNumber = parsePhoneNumberWithError(value, 'AE');
+            return phoneNumber.isValid();
+          } catch (err) {
+            return false;
+          }
+        },
+        message: 'Emergency contact phone must be valid.'
+      }
+    },
+    relationship: {
+      type: String,
+      required: true,
+      enum: ['spouse', 'parent', 'sibling', 'child', 'friend', 'other']
+    }
+  },
+  associatedCompany: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'Company',
+    default: null
+  },
+  externalCompanyDetails: {
+    companyName: String,
+    contactPerson: String,
+    contactPhone: String
+  },
+  truckNumber: {
+    type: String,
+    required: true
+  },
+  userId: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'User',
+    required: true
+  },
+  licenseInfo: {
+    licenseNumber: {
+      type: String,
+      required: true
+    },
+    licenseExpiry: {
+      type: Date,
+      required: true,
+      validate: {
+        validator: function(value) {
+          return value > new Date();
+        },
+        message: 'License expiry date must be in the future.'
+      }
+    },
+    licenseType: {
+      type: String,
+      required: true,
+      enum: ['light', 'heavy', 'commercial']
+    }
+  },
+  isActive: {
+    type: Boolean,
+    default: true
+  },
+  rating: {
+    type: Number,
+    min: 1,
+    max: 5,
+    default: null
+  },
+  totalJobs: {
+    type: Number,
+    default: 0
+  }
+}, {
+  timestamps: true
+});
 
-// Indexes
+// Indexes for performance
+DriverSchema.index({ driverIdNumber: 1 });
 DriverSchema.index({ driverPhone: 1 });
-DriverSchema.index({ licensePlate: 1 });
+DriverSchema.index({ associatedCompany: 1 });
 DriverSchema.index({ userId: 1 });
 
-// Create Driver model
-const Driver = mongoose.model('Driver', DriverSchema);
-module.exports = Driver;
+module.exports = mongoose.model('Driver', DriverSchema);

@@ -5,7 +5,9 @@ const express = require('express');
 const cors = require('cors');
 const connectDB = require('./config/db'); // Import the database connection utility
 const mongoose = require('mongoose'); // For database connection and graceful shutdown
-const errorHandler = require('./middleware/errorHandler'); // Central error handler     
+const errorHandler = require('./middleware/errorHandler'); // Central error handler
+const logger = require('./config/logger'); // Winston logger
+const { setupSecurity, rateLimiters } = require('./middleware/security'); // Security middleware     
 
 const authRoutes = require('./routes/authRoutes'); // Authentication routes
 const userRoutes = require('./routes/userRoutes'); // User-related routes
@@ -14,18 +16,39 @@ const roleTransitionRoutes = require('./routes/roleTransitionRoutes'); // Role t
 const driverRoutes = require('./routes/driverRoutes');
 const truckRoutes = require('./routes/truckRoutes');
 const jobCardRoutes = require('./routes/jobCardRoutes');
+const healthRoutes = require('./routes/healthRoutes');
+const { specs, swaggerUi } = require('./config/swagger');
 
 const app = express();
 
 // Connect to MongoDB
 connectDB();
 
+// Security setup
+setupSecurity(app);
+
 // Middleware setup
-app.use(express.json()); // Parses JSON data in requests
+app.use(express.json({ limit: '10mb' })); // Parses JSON data in requests with size limit
 app.use(cors()); // Enables cross-origin resource sharing
 
-// Mount routes
-app.use('/api/auth', authRoutes); // Authentication endpoints
+// Request logging
+app.use((req, res, next) => {
+  logger.info(`${req.method} ${req.path}`, {
+    ip: req.ip,
+    userAgent: req.get('User-Agent'),
+    userId: req.user?.id
+  });
+  next();
+});
+
+// Health check routes
+app.use('/health', healthRoutes);
+
+// API Documentation
+app.use('/api-docs', swaggerUi.serve, swaggerUi.setup(specs));
+
+// Mount routes with rate limiting
+app.use('/api/auth', rateLimiters.auth, authRoutes); // Authentication endpoints
 app.use('/api/users', userRoutes); // User endpoints
 app.use('/api/companies', companyRoutes); // Company endpoints
 app.use('/api/role-transition', roleTransitionRoutes); // role transition endpoint
