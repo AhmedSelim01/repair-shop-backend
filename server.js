@@ -138,8 +138,13 @@ process.on('SIGINT', async () => {
 
 // ===== SERVER STARTUP =====
 const PORT = process.env.PORT || 3000;
-app.listen(PORT, '0.0.0.0', () => {
+const server = app.listen(PORT, '0.0.0.0', () => {
     console.log(`🚀 Server running on port ${PORT}`);
     console.log(`📚 API Documentation: http://localhost:${PORT}/api-docs`);
     console.log(`❤️  Health Check: http://localhost:${PORT}/health`);
+    console.log(`⚡ WebSocket Server: ws://localhost:${PORT}/ws`);
 });
+
+// ===== WEBSOCKET SETUP =====
+const realTimeTracker = require('./utils/realTimeTracker');
+realTimeTracker.initialize(server);
