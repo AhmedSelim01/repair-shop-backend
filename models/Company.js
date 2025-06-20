@@ -2,7 +2,7 @@ const mongoose = require('mongoose');
 const BankDetailsSchema = require('./schemas/BankDetailsSchema');
 const CompanyLicenseDetailsSchema = require('./schemas/CompanyLicenseDetailsSchema');
 const CompanyOwnerDetailsSchema = require('./schemas/CompanyOwnerDetailsSchema');
-const { Schema } = mongoose;
+const { Schema, model } = mongoose;
 
 const CompanySchema = new Schema(
     {
