@@ -17,6 +17,8 @@ const driverRoutes = require('./routes/driverRoutes');
 const truckRoutes = require('./routes/truckRoutes');
 const jobCardRoutes = require('./routes/jobCardRoutes');
 const healthRoutes = require('./routes/healthRoutes');
+const storeRoutes = require('./routes/storeRoutes');
+const cartRoutes = require('./routes/cartRoutes');
 
 // Initialize Express application
 const app = express();
@@ -59,6 +61,8 @@ app.use('/api/role-transition', roleTransitionRoutes); // role transition endpoi
 app.use('/api/drivers', driverRoutes); // driver endpoints
 app.use('/api/trucks', truckRoutes); // truck endpoints
 app.use('/api/jobcard', jobCardRoutes); // jobcard endpoints
+app.use('/api/store', storeRoutes);
+app.use('/api/cart', cartRoutes);
 
 // Example route to check server setup
 app.get('/', (req, res) => {

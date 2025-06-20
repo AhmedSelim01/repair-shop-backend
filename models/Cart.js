@@ -45,18 +45,17 @@ CartSchema.pre('save', function (next) {
     next();
 });
 
-// Example method: Finds the active cart for a user
-Cart.getActiveCart = async (userId) => {
-    return await Cart.findOne({ userId, status: 'active' });
+// Static method: Finds the active cart for a user
+CartSchema.statics.getActiveCart = async function(userId) {
+    return await this.findOne({ userId, status: 'active' });
 };
 
-// Example method: Checkout and update the cart's status
-Cart.checkoutCart = async function () {
+// Instance method: Checkout and update the cart's status
+CartSchema.methods.checkoutCart = async function() {
     this.status = 'checked-out';
     await this.save();
     return this;
 };
-
 
 const Cart = mongoose.model('Cart', CartSchema);
 module.exports = Cart;
