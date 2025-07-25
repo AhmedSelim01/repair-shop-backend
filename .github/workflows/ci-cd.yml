@@ -1,0 +1,158 @@
+
+name: 🚀 Repair Shop CI/CD Pipeline
+
+on:
+  push:
+    branches: [ main, develop ]
+  pull_request:
+    branches: [ main ]
+
+env:
+  NODE_VERSION: '20'
+  REPLIT_TOKEN: ${{ secrets.REPLIT_TOKEN }}
+
+jobs:
+  # ===== TESTING & QUALITY CHECKS =====
+  test:
+    name: 🧪 Run Tests & Quality Checks
+    runs-on: ubuntu-latest
+    
+    services:
+      mongodb:
+        image: mongo:7.0
+        ports:
+          - 27017:27017
+        options: >-
+          --health-cmd "mongosh --eval 'db.adminCommand(\"ismaster\")'"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    steps:
+    - name: 📥 Checkout code
+      uses: actions/checkout@v4
+
+    - name: 🟢 Setup Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: ${{ env.NODE_VERSION }}
+        cache: 'npm'
+
+    - name: 📦 Install dependencies
+      run: npm ci
+
+    - name: 🔍 Run ESLint
+      run: npx eslint . --ext .js --format=compact
+
+    - name: 🧪 Run unit tests
+      run: npm test
+      env:
+        MONGODB_URI: mongodb://localhost:27017/repair_shop_test
+        JWT_SECRET: test_jwt_secret_key_for_ci
+        NODE_ENV: test
+
+    - name: 📊 Generate test coverage
+      run: npm run test:coverage
+      env:
+        MONGODB_URI: mongodb://localhost:27017/repair_shop_test
+        JWT_SECRET: test_jwt_secret_key_for_ci
+        NODE_ENV: test
+
+    - name: 📈 Upload coverage to Codecov
+      uses: codecov/codecov-action@v3
+      with:
+        file: ./coverage/lcov.info
+        fail_ci_if_error: false
+
+  # ===== SECURITY SCANNING =====
+  security:
+    name: 🔒 Security Scan
+    runs-on: ubuntu-latest
+    needs: test
+
+    steps:
+    - name: 📥 Checkout code
+      uses: actions/checkout@v4
+
+    - name: 🟢 Setup Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: ${{ env.NODE_VERSION }}
+        cache: 'npm'
+
+    - name: 📦 Install dependencies
+      run: npm ci
+
+    - name: 🔍 Run npm audit
+      run: npm audit --audit-level moderate
+
+    - name: 🛡️ Run Snyk security scan
+      uses: snyk/actions/node@master
+      env:
+        SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
+      with:
+        args: --severity-threshold=high
+      continue-on-error: true
+
+  # ===== BUILD & DEPLOY =====
+  deploy:
+    name: 🚀 Deploy to Replit
+    runs-on: ubuntu-latest
+    needs: [test, security]
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+
+    steps:
+    - name: 📥 Checkout code
+      uses: actions/checkout@v4
+
+    - name: 🟢 Setup Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: ${{ env.NODE_VERSION }}
+        cache: 'npm'
+
+    - name: 📦 Install dependencies
+      run: npm ci --only=production
+
+    - name: 🔧 Create production environment file
+      run: |
+        echo "MONGODB_URI=${{ secrets.MONGODB_URI }}" > .env
+        echo "JWT_SECRET=${{ secrets.JWT_SECRET }}" >> .env
+        echo "NODE_ENV=production" >> .env
+        echo "PORT=3000" >> .env
+        echo "STRIPE_SECRET_KEY=${{ secrets.STRIPE_SECRET_KEY }}" >> .env
+
+    - name: 🚀 Deploy to Replit
+      run: |
+        echo "Deploying to Replit..."
+        # This will trigger Replit's auto-deployment when code is pushed
+        curl -X POST "https://api.replit.com/v1/repls/${{ secrets.REPL_ID }}/deploy" \
+          -H "Authorization: Bearer ${{ secrets.REPLIT_TOKEN }}" \
+          -H "Content-Type: application/json" \
+          -d '{"branch": "main"}'
+
+    - name: 🏥 Health check after deployment
+      run: |
+        sleep 30  # Wait for deployment to complete
+        curl -f "${{ secrets.REPL_URL }}/health" || exit 1
+
+  # ===== NOTIFICATION =====
+  notify:
+    name: 📧 Notify Deployment Status
+    runs-on: ubuntu-latest
+    needs: [deploy]
+    if: always()
+
+    steps:
+    - name: 📧 Send deployment notification
+      uses: 8398a7/action-slack@v3
+      if: always()
+      with:
+        status: ${{ job.status }}
+        text: |
+          🚀 Repair Shop API Deployment Status: ${{ job.status }}
+          📝 Commit: ${{ github.sha }}
+          👤 Author: ${{ github.actor }}
+          🔗 URL: ${{ secrets.REPL_URL }}
+      env:
+        SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
