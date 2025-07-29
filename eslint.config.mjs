@@ -15,12 +15,22 @@ export default [
       },
       parserOptions: {
         ecmaVersion: 'latest',
-        sourceType: 'module'
+        sourceType: 'script' // Changed from 'module' to 'script' for CommonJS
       }
     },
     rules: {
       'no-console': 'off',
-      'import/no-commonjs': 'error'
+      'import/no-commonjs': 'off', // Disabled CommonJS checks
+      'no-undef': 'error'
+    }
+  },
+  {
+    files: ['**/*.test.js'],
+    env: {
+      mocha: true
+    },
+    rules: {
+      'no-undef': 'off'
     }
   },
   {

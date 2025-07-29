@@ -10,7 +10,6 @@ env:
   NODE_VERSION: '20'
 
 jobs:
-  # ===== TESTING & QUALITY CHECKS =====
   test:
     name: 🧪 Run Tests & Quality Checks
     runs-on: ubuntu-latest
@@ -37,12 +36,12 @@ jobs:
         cache: 'npm'
 
     - name: 📦 Install dependencies
-      run: npm ci
+      run: |
+        npm ci
+        npm install eslint-plugin-import @typescript-eslint/parser @typescript-eslint/eslint-plugin --save-dev
 
     - name: 🔍 Run ESLint
-      run:
-       npm install eslint-plugin-import --save-dev
-       npx eslint . --ext .js --format=compact
+      run: npx eslint . --ext .js,.cjs --format=compact
 
     - name: 🧪 Run unit tests
       run: npm test
@@ -64,7 +63,6 @@ jobs:
         file: ./coverage/lcov.info
         fail_ci_if_error: false
 
-  # ===== SECURITY SCANNING =====
   security:
     name: 🔒 Security Scan
     runs-on: ubuntu-latest
@@ -94,7 +92,6 @@ jobs:
         args: --severity-threshold=high
       continue-on-error: true
 
-  # ===== NOTIFICATION =====
   notify:
     name: 📧 Notify Deployment Status
     runs-on: ubuntu-latest
