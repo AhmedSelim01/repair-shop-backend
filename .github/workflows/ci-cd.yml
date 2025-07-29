@@ -40,7 +40,9 @@ jobs:
       run: npm ci
 
     - name: 🔍 Run ESLint
-      run: npx eslint . --ext .js --format=compact
+      run:
+       npm install eslint-plugin-import --save-dev
+       npx eslint . --ext .js --format=compact
 
     - name: 🧪 Run unit tests
       run: npm test

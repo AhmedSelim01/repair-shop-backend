@@ -1,10 +1,13 @@
 import js from '@eslint/js';
 import globals from 'globals';
+import importPlugin from 'eslint-plugin-import';
 
 export default [
   js.configs.recommended,
   {
-    files: ['**/*.{js,mjs}'],
+    plugins: {
+      import: importPlugin
+    },
     languageOptions: {
       globals: {
         ...globals.node,

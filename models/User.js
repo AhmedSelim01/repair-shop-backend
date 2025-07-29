@@ -12,7 +12,7 @@ const { parsePhoneNumberWithError } = require('libphonenumber-js'); // Internati
  */
 const UserSchema = new mongoose.Schema(
   {
-    // ===== BASIC USER INFORMATION =====
+    // ===== BASIC USER INFORMATION ====="git commit -m "ci: update workflow"
     name: { 
       type: String, 
       trim: true, // Removes whitespace from beginning and end
