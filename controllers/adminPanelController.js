@@ -11,10 +11,7 @@ const Company = require('../models/Company');
 const JobCard = require('../models/JobCard');
 const Payment = require('../models/Payment');
 const Truck = require('../models/Truck');
-const Driver = require('../models/Driver');
-const Notification = require('../models/Notification');
 const StoreItem = require('../models/StoreItem');
-const Cart = require('../models/Cart');
 const logger = require('../config/logger');
 
 /**

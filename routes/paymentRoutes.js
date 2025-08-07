@@ -1,59 +1,73 @@
 const express = require('express');
-const { processPayment } = require('../services/paymentService');
-const router = express.Router();
-
-router.post('/process-payment', async (req, res) => {
-    const { amount, currency, email, jobCardId } = req.body;
-
-    if (!amount || !currency || !email || !jobCardId) {
-        return res.status(400).json({ success: false, message: 'Amount, currency, email, and jobCardId are required.' });
-    }
-
-    try {
-        const paymentIntent = await processPayment(amount, currency, email, jobCardId);
-        res.status(200).json({ success: true, paymentIntent });
-    } catch (error) {
-        res.status(500).json({ success: false, message: error.message });
-    }
-});
-
-module.exports = router;
-const express = require('express');
 const {
-    processPayment,
-    getPaymentHistory,
-    getPaymentById,
-    refundPayment,
-    getPaymentAnalytics,
-    webhookHandler
+  processPayment,
+  getPaymentHistory,
+  getPaymentById,
+  refundPayment,
+  getPaymentAnalytics,
+  webhookHandler
 } = require('../controllers/paymentController');
 const { authMiddleware, roleMiddleware } = require('../middleware/authMiddleware');
+const { validateWebhookSignature } = require('../middleware/webhookMiddleware');
 
 const router = express.Router();
 
 /**
  * @swagger
  * components:
+ *   securitySchemes:
+ *     bearerAuth:
+ *       type: http
+ *       scheme: bearer
+ *       bearerFormat: JWT
  *   schemas:
  *     Payment:
  *       type: object
  *       required:
  *         - amount
- *         - paymentMethod
+ *         - currency
+ *         - email
  *         - jobCardId
+ *         - paymentMethodDetails
  *       properties:
- *         transactionId:
+ *         idempotencyKey:
  *           type: string
- *           description: Unique transaction identifier
+ *           description: Unique key to prevent duplicate payments
  *         amount:
  *           type: number
- *           description: Payment amount
- *         paymentMethod:
+ *           format: double
+ *           minimum: 0.01
+ *           example: 99.99
+ *         currency:
  *           type: string
- *           enum: [credit_card, debit_card, cash, bank_transfer, digital_wallet]
- *         paymentStatus:
+ *           enum: [USD, EUR, GBP]
+ *           default: USD
+ *         email:
  *           type: string
- *           enum: [pending, processing, completed, failed, refunded, cancelled]
+ *           format: email
+ *           example: user@example.com
+ *         jobCardId:
+ *           type: string
+ *           pattern: '^[a-f\d]{24}$'
+ *           example: 507f1f77bcf86cd799439011
+ *         paymentMethodDetails:
+ *           type: object
+ *           required:
+ *             - type
+ *           properties:
+ *             type:
+ *               type: string
+ *               enum: [credit_card, debit_card, bank_transfer, digital_wallet]
+ *             last4:
+ *               type: string
+ *               pattern: '^\d{4}$'
+ *               example: "4242"
+ *             brand:
+ *               type: string
+ *               example: "visa"
+ *         metadata:
+ *           type: object
+ *           additionalProperties: true
  */
 
 /**
@@ -69,33 +83,79 @@ const router = express.Router();
  *       content:
  *         application/json:
  *           schema:
- *             type: object
- *             required:
- *               - amount
- *               - paymentMethod
- *               - jobCardId
- *             properties:
- *               amount:
- *                 type: number
- *               paymentMethod:
- *                 type: string
- *               jobCardId:
- *                 type: string
- *               cardToken:
- *                 type: string
+ *             $ref: '#/components/schemas/Payment'
  *     responses:
  *       200:
  *         description: Payment processed successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                 paymentIntent:
+ *                   type: object
+ *                 clientSecret:
+ *                   type: string
+ *                   description: Client-side payment confirmation key
  *       400:
- *         description: Invalid payment data
+ *         description: Invalid request
+ *       401:
+ *         description: Unauthorized
+ *       409:
+ *         description: Duplicate payment (idempotency key conflict)
+ *       500:
+ *         description: Server error
  */
-router.post('/process', authMiddleware, processPayment);
+router.post('/process', authMiddleware, async (req, res) => {
+  const { amount, currency, email, jobCardId, paymentMethodDetails, idempotencyKey } = req.body;
+
+  // Enhanced validation
+  if (!amount || amount <= 0 || 
+      !currency || !['USD', 'EUR', 'GBP'].includes(currency) ||
+      !email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email) ||
+      !jobCardId || !/^[a-f\d]{24}$/.test(jobCardId) ||
+      !paymentMethodDetails?.type) {
+    return res.status(400).json({ 
+      success: false, 
+      message: 'Invalid payment data',
+      details: {
+        amount: 'Must be positive number',
+        currency: 'Must be USD, EUR, or GBP',
+        email: 'Must be valid email',
+        jobCardId: 'Must be 24-character hex ID',
+        paymentMethod: 'Must include type'
+      }
+    });
+  }
+
+  try {
+    const result = await processPayment({
+      amount,
+      currency,
+      email,
+      jobCardId,
+      paymentMethodDetails,
+      idempotencyKey,
+      metadata: req.body.metadata || {}
+    });
+    res.status(200).json({ success: true, ...result });
+  } catch (error) {
+    const status = error.statusCode || 500;
+    res.status(status).json({ 
+      success: false, 
+      error: error.code || 'payment_error',
+      message: error.message 
+    });
+  }
+});
 
 /**
  * @swagger
  * /api/payments/history:
  *   get:
- *     summary: Get payment history
+ *     summary: Get paginated payment history
  *     tags: [Payments]
  *     security:
  *       - bearerAuth: []
@@ -104,15 +164,41 @@ router.post('/process', authMiddleware, processPayment);
  *         name: page
  *         schema:
  *           type: integer
- *         description: Page number
+ *           minimum: 1
+ *           default: 1
  *       - in: query
  *         name: limit
  *         schema:
  *           type: integer
- *         description: Items per page
+ *           minimum: 1
+ *           maximum: 100
+ *           default: 20
+ *       - in: query
+ *         name: status
+ *         schema:
+ *           type: string
+ *           enum: [pending, completed, failed, refunded]
  *     responses:
  *       200:
- *         description: Payment history retrieved successfully
+ *         description: Payment history retrieved
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 data:
+ *                   type: array
+ *                   items:
+ *                     $ref: '#/components/schemas/Payment'
+ *                 pagination:
+ *                   type: object
+ *                   properties:
+ *                     total:
+ *                       type: integer
+ *                     page:
+ *                       type: integer
+ *                     limit:
+ *                       type: integer
  */
 router.get('/history', authMiddleware, getPaymentHistory);
 
@@ -120,7 +206,7 @@ router.get('/history', authMiddleware, getPaymentHistory);
  * @swagger
  * /api/payments/{id}:
  *   get:
- *     summary: Get payment by ID
+ *     summary: Get payment details
  *     tags: [Payments]
  *     security:
  *       - bearerAuth: []
@@ -130,9 +216,14 @@ router.get('/history', authMiddleware, getPaymentHistory);
  *         required: true
  *         schema:
  *           type: string
+ *           pattern: '^[a-f\d]{24}$'
  *     responses:
  *       200:
- *         description: Payment details retrieved successfully
+ *         description: Payment details
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/Payment'
  *       404:
  *         description: Payment not found
  */
@@ -142,7 +233,7 @@ router.get('/:id', authMiddleware, getPaymentById);
  * @swagger
  * /api/payments/{id}/refund:
  *   post:
- *     summary: Process payment refund
+ *     summary: Initiate refund
  *     tags: [Payments]
  *     security:
  *       - bearerAuth: []
@@ -152,22 +243,29 @@ router.get('/:id', authMiddleware, getPaymentById);
  *         required: true
  *         schema:
  *           type: string
+ *           pattern: '^[a-f\d]{24}$'
  *     requestBody:
  *       required: true
  *       content:
  *         application/json:
  *           schema:
  *             type: object
+ *             required:
+ *               - reason
  *             properties:
  *               amount:
  *                 type: number
+ *                 minimum: 0.01
  *               reason:
  *                 type: string
+ *                 minLength: 10
+ *               idempotencyKey:
+ *                 type: string
  *     responses:
- *       200:
- *         description: Refund processed successfully
+ *       202:
+ *         description: Refund initiated
  *       400:
- *         description: Cannot process refund
+ *         description: Invalid refund request
  */
 router.post('/:id/refund', authMiddleware, roleMiddleware(['admin', 'employee']), refundPayment);
 
@@ -184,10 +282,36 @@ router.post('/:id/refund', authMiddleware, roleMiddleware(['admin', 'employee'])
  *         name: timeframe
  *         schema:
  *           type: string
- *           enum: [week, month, quarter, year]
+ *           enum: [day, week, month, quarter, year, custom]
+ *           default: month
+ *       - in: query
+ *         name: startDate
+ *         schema:
+ *           type: string
+ *           format: date
+ *       - in: query
+ *         name: endDate
+ *         schema:
+ *           type: string
+ *           format: date
  *     responses:
  *       200:
- *         description: Payment analytics retrieved successfully
+ *         description: Analytics data
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 totalVolume:
+ *                   type: number
+ *                 successfulPayments:
+ *                   type: integer
+ *                 refundRate:
+ *                   type: number
+ *                 methods:
+ *                   type: object
+ *                   additionalProperties:
+ *                     type: integer
  */
 router.get('/analytics', authMiddleware, roleMiddleware(['admin', 'employee']), getPaymentAnalytics);
 
@@ -195,7 +319,7 @@ router.get('/analytics', authMiddleware, roleMiddleware(['admin', 'employee']), 
  * @swagger
  * /api/payments/webhook:
  *   post:
- *     summary: Payment gateway webhook
+ *     summary: Payment webhook handler
  *     tags: [Payments]
  *     requestBody:
  *       required: true
@@ -203,10 +327,22 @@ router.get('/analytics', authMiddleware, roleMiddleware(['admin', 'employee']), 
  *         application/json:
  *           schema:
  *             type: object
+ *             properties:
+ *               eventId:
+ *                 type: string
+ *               type:
+ *                 type: string
+ *                 enum: [payment_succeeded, payment_failed, refund_processed]
+ *               data:
+ *                 type: object
  *     responses:
  *       200:
- *         description: Webhook processed successfully
+ *         description: Webhook acknowledged
+ *       400:
+ *         description: Invalid webhook payload
+ *       401:
+ *         description: Invalid signature
  */
-router.post('/webhook', webhookHandler);
+router.post('/webhook', validateWebhookSignature, webhookHandler);
 
 module.exports = router;

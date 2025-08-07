@@ -41,7 +41,9 @@ jobs:
         npm install eslint-plugin-import @typescript-eslint/parser @typescript-eslint/eslint-plugin --save-dev
 
     - name: 🔍 Run ESLint
-      run: npx eslint . --ext .js,.cjs --format=compact
+      run: |
+        npm install eslint-plugin-import globals --save-dev
+        npx eslint . --ext .js,.cjs --format=compact
 
     - name: 🧪 Run unit tests
       run: npm test

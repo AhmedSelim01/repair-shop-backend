@@ -10,27 +10,27 @@ export default [
     },
     languageOptions: {
       globals: {
-        ...globals.node,
-        ...globals.es2021
+        ...globals.node,       // Replaces 'env: { node: true }'
+        ...globals.es2021,     // Replaces 'env: { es2021: true }'
+        ...globals.mocha       // For test files
       },
       parserOptions: {
         ecmaVersion: 'latest',
-        sourceType: 'script' // Changed from 'module' to 'script' for CommonJS
+        sourceType: 'script'   // For CommonJS support
       }
     },
     rules: {
       'no-console': 'off',
-      'import/no-commonjs': 'off', // Disabled CommonJS checks
+      'import/no-commonjs': 'off',
       'no-undef': 'error'
     }
   },
   {
     files: ['**/*.test.js'],
-    env: {
-      mocha: true
-    },
-    rules: {
-      'no-undef': 'off'
+    languageOptions: {
+      globals: {
+        ...globals.mocha
+      }
     }
   },
   {

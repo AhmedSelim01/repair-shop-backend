@@ -1,4 +1,4 @@
-const Company = require(.../models/company);
+const Company = require('../models/Company');
 const asyncHandler = require('express-async-handler');
 
 exports.requireCompleteProfile = asyncHandler(async (req, res, next) => {

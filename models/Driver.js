@@ -1,4 +1,3 @@
-
 const mongoose = require('mongoose');
 const { parsePhoneNumberWithError } = require('libphonenumber-js');
 
@@ -19,7 +18,9 @@ const DriverSchema = new mongoose.Schema({
         try {
           const phoneNumber = parsePhoneNumberWithError(value, 'AE');
           return phoneNumber.isValid();
-        } catch (err) {
+        } catch (error) {
+          console.debug('Phone validation failed silently:', error.message);
+
           return false;
         }
       },
@@ -54,7 +55,7 @@ const DriverSchema = new mongoose.Schema({
           try {
             const phoneNumber = parsePhoneNumberWithError(value, 'AE');
             return phoneNumber.isValid();
-          } catch (err) {
+          } catch {
             return false;
           }
         },

@@ -1,4 +1,3 @@
-
 const swaggerJsdoc = require('swagger-jsdoc');
 const swaggerUi = require('swagger-ui-express');
 
@@ -8,32 +7,52 @@ const options = {
     info: {
       title: 'Repair Shop Management API',
       version: '1.0.0',
-      description: 'A comprehensive API for managing repair shop operations, trucks, drivers, and job cards',
+      description: 'API for managing repair shop operations',
+      contact: {
+        name: 'API Support',
+        email: process.env.EMAIL_USER || 'support@yourdomain.com' // Safely falls back
+      }
     },
     servers: [
       {
-        url: process.env.NODE_ENV === 'production' ? 'https://your-domain.replit.app' : 'http://localhost:3000',
-        description: process.env.NODE_ENV === 'production' ? 'Production server' : 'Development server',
-      },
+        url: process.env.NODE_ENV === 'production'
+          ? process.env.PRODUCTION_URL || 'https://api.yourdomain.com' // Generic fallback
+          : `http://localhost:${process.env.PORT || 3000}`,
+        description: process.env.NODE_ENV === 'production'
+          ? 'Production server'
+          : `Development server (port: ${process.env.PORT || 3000})`
+      }
     ],
     components: {
       securitySchemes: {
         bearerAuth: {
           type: 'http',
           scheme: 'bearer',
-          bearerFormat: 'JWT',
-        },
-      },
+          bearerFormat: 'JWT'
+        }
+      }
     },
-    security: [
-      {
-        bearerAuth: [],
-      },
-    ],
+    security: [{
+      bearerAuth: []
+    }]
   },
-  apis: ['./routes/*.js', './models/*.js'], // paths to files containing OpenAPI definitions
+  apis: ['./routes/*.js', './models/*.js']
 };
 
 const specs = swaggerJsdoc(options);
 
-module.exports = { specs, swaggerUi };
+module.exports = {
+  specs,
+  swaggerUi,
+  serveSwagger: (app, endpoint = '/api-docs') => {
+    app.use(
+      endpoint,
+      swaggerUi.serve,
+      swaggerUi.setup(specs, {
+        swaggerOptions: {
+          persistAuthorization: true
+        }
+      })
+    );
+  }
+};
